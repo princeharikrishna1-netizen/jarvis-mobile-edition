@@ -1,31 +1,395 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>J.A.R.V.I.S</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J.A.R.V.I.S</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Orbitron', monospace, sans-serif;
+    }
+
+    body {
+      background-color: #000000;
+      color: #00e5ff;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    .jarvis-container {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-top: 10px;
+      margin-bottom: 25px;
+    }
+
+    header h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 12px;
+      color: #00e5ff;
+      text-shadow: 0 0 10px rgba(0, 229, 255, 0.8), 0 0 20px rgba(0, 229, 255, 0.4);
+    }
+
+    header p {
+      font-size: 9px;
+      letter-spacing: 5px;
+      color: #00e5ff;
+      opacity: 0.75;
+      margin-top: 4px;
+    }
+
+    /* Arc Reactor Core Container */
+    .reactor-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .core-reactor {
+      position: relative;
+      width: 160px;
+      height: 160px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Background Ambient Glow */
+    .glow-disc {
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0, 229, 255, 0.4) 0%, rgba(0, 229, 255, 0.05) 65%, transparent 80%);
+      filter: blur(10px);
+      animation: ambientGlow 2s ease-in-out infinite alternate;
+    }
+
+    /* Outer Ring: Rotating Clockwise */
+    .outer-ring {
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      border-top: 3px solid #00e5ff;
+      border-bottom: 3px solid #00e5ff;
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.6);
+      animation: spinClockwise 5s linear infinite;
+    }
+
+    /* Middle Dashed Ring: Rotating Anti-Clockwise */
+    .middle-ring {
+      position: absolute;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      border: 2px dashed rgba(0, 229, 255, 0.7);
+      border-left: 3px solid #00e5ff;
+      border-right: 3px solid #00e5ff;
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+      animation: spinCounterClockwise 3.5s linear infinite;
+    }
+
+    /* Inner Ring: Rotating Clockwise */
+    .inner-ring {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      border-top: 2px solid #00e5ff;
+      border-left: 2px solid #00e5ff;
+      animation: spinClockwise 2s linear infinite;
+    }
+
+    /* Center Light / Core: Bright Blinking & Pulsing */
+    .inner-core {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #00e5ff;
+      border: 2px solid #ffffff;
+      animation: coreLightBlink 1.2s ease-in-out infinite alternate;
+    }
+
+    .core-status-text {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #00e5ff;
+      margin-top: 18px;
+      text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+    }
+
+    /* Animations Keyframes */
+    @keyframes spinClockwise {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes spinCounterClockwise {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(-360deg); }
+    }
+
+    @keyframes coreLightBlink {
+      0% {
+        opacity: 0.3;
+        transform: scale(0.85);
+        box-shadow: 0 0 10px rgba(0, 229, 255, 0.4), inset 0 0 5px rgba(255, 255, 255, 0.3);
+      }
+      50% {
+        opacity: 0.7;
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1.08);
+        box-shadow: 0 0 35px #00e5ff, 0 0 60px rgba(0, 229, 255, 0.8), inset 0 0 15px #ffffff;
+      }
+    }
+
+    @keyframes ambientGlow {
+      0% {
+        opacity: 0.3;
+        transform: scale(0.9);
+      }
+      100% {
+        opacity: 0.85;
+        transform: scale(1.15);
+      }
+    }
+
+    /* System Status Panel */
+    .status-panel {
+      border: 1px solid #00e5ff;
+      padding: 12px 18px;
+      margin-bottom: 18px;
+      background: transparent;
+      box-shadow: inset 0 0 8px rgba(0, 229, 255, 0.05);
+    }
+
+    .status-header {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #00e5ff;
+      margin-bottom: 8px;
+    }
+
+    .status-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      letter-spacing: 1.5px;
+    }
+
+    .status-row .label {
+      color: #00e5ff;
+      font-weight: 600;
+    }
+
+    .status-row .val.online {
+      color: #00ff66;
+      font-weight: 700;
+      text-shadow: 0 0 6px rgba(0, 255, 102, 0.7);
+    }
+
+    .status-row .val.locked {
+      color: #ff2a2a;
+      font-weight: 700;
+      text-shadow: 0 0 6px rgba(255, 42, 42, 0.7);
+    }
+
+    /* Chat Terminal */
+    .chat-terminal {
+      border: 1px solid #00e5ff;
+      height: 140px;
+      background: transparent;
+      padding: 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .chat-terminal::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .chat-terminal::-webkit-scrollbar-thumb {
+      background: #00e5ff;
+    }
+
+    .msg {
+      font-size: 11px;
+      letter-spacing: 1px;
+      line-height: 1.4;
+    }
+
+    .msg.user {
+      color: #ffffff;
+    }
+
+    .msg.ai {
+      color: #00e5ff;
+    }
+
+    /* Input Panel */
+    .input-panel {
+      display: flex;
+      gap: 8px;
+      height: 38px;
+    }
+
+    .input-panel input {
+      flex: 1;
+      background: #000000;
+      border: 1px solid #00e5ff;
+      color: #00e5ff;
+      padding: 0 14px;
+      font-size: 11px;
+      letter-spacing: 1px;
+      outline: none;
+    }
+
+    .input-panel input::placeholder {
+      color: rgba(0, 229, 255, 0.5);
+      font-size: 10px;
+    }
+
+    .input-panel button {
+      background: #00e5ff;
+      color: #000000;
+      border: none;
+      padding: 0 24px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .input-panel button:hover {
+      background: #33eeff;
+      box-shadow: 0 0 12px #00e5ff;
+    }
+  </style>
 </head>
 <body>
-  <header><h1>J.A.R.V.I.S</h1><p>MOBILE EDITION</p></header>
-  <div class="core">
-    <div class="ring r1"></div>
-    <div class="ring r2"></div>
-    <div class="center"></div>
+
+  <div class="jarvis-container">
+    <header>
+      <h1>J.A.R.V.I.S</h1>
+      <p>MOBILE EDITION</p>
+    </header>
+
+    <div class="reactor-wrapper">
+      <div class="core-reactor">
+        <div class="glow-disc"></div>
+        <div class="outer-ring"></div>
+        <div class="middle-ring"></div>
+        <div class="inner-ring"></div>
+        <div class="inner-core"></div>
+      </div>
+      <p class="core-status-text">CORE ACTIVE</p>
+    </div>
+
+    <div class="status-panel">
+      <div class="status-header">SYSTEM STATUS</div>
+      <div class="status-grid">
+        <div class="status-row">
+          <span class="label">AI CORE</span>
+          <span class="val online">▪ ONLINE</span>
+        </div>
+        <div class="status-row">
+          <span class="label">NETWORK</span>
+          <span class="val online">▪ ONLINE</span>
+        </div>
+        <div class="status-row">
+          <span class="label">VOICE</span>
+          <span class="val locked">▫ LOCKED</span>
+        </div>
+        <div class="status-row">
+          <span class="label">MEMORY</span>
+          <span class="val locked">▫ LOCKED</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-terminal" id="chat"></div>
+
+    <div class="input-panel">
+      <input type="text" id="msg" placeholder="Ask J.A.R.V.I.S..." autocomplete="off">
+      <button id="send">SEND</button>
+    </div>
   </div>
-  <p class="core-text">CORE ACTIVE</p>
-  <div class="status">
-    <h2>SYSTEM STATUS</h2>
-    <div class="row"><span>AI CORE</span><b class="on">● ONLINE</b></div>
-    <div class="row"><span>NETWORK</span><b class="on">● ONLINE</b></div>
-    <div class="row"><span>VOICE</span><b class="off">○ LOCKED</b></div>
-    <div class="row"><span>MEMORY</span><b class="off">○ LOCKED</b></div>
-  </div>
-  <div class="chat" id="chat"></div>
-  <div class="input-area">
-    <input id="msg" placeholder="Ask J.A.R.V.I.S...">
-    <button id="send">SEND</button>
-  </div>
-  <script src="script.js"></script>
+
+  <script>
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('msg');
+    const sendBtn = document.getElementById('send');
+
+    function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendMessage('YOU: ' + text, 'user');
+      input.value = '';
+
+      const aiMsg = appendMessage('J.A.R.V.I.S: Processing...', 'ai');
+
+      setTimeout(() => {
+        aiMsg.innerText = 'J.A.R.V.I.S: Systems online. How may I assist you, Boss?';
+        chat.scrollTop = chat.scrollHeight;
+      }, 1000);
+    }
+
+    function appendMessage(text, type) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + type;
+      div.innerText = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div;
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+  </script>
 </body>
 </html>
