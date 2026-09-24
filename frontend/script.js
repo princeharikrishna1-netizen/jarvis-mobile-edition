@@ -1,3 +1,6 @@
+// ===== 3. TOOLS (THE HANDS) — 15 TOOLS =====
+async function handleTools(text){
+const t = text.toLowerCase();
 // 1. Time
 if(/\btime\b/.test(t)||t.includes('టైమ్')||t.includes('సమయం'))
 return 'The time is '+new Date().toLocaleTimeString()+', Boss.';
