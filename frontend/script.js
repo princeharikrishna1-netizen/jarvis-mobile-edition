@@ -1,20 +1,27 @@
 // =====================================================
-// J.A.R.V.I.S - AI CORE + 15 TOOLS
+// J.A.R.V.I.S - COMPLETE AI CORE
+// Gemini + Memory + Voice + Vision + 15 TOOLS
 // =====================================================
 
+
 // =====================================================
-// 1. API KEY & SMART MODELS
+// 1. API KEY
 // =====================================================
 
-let API_KEY = localStorage.getItem('jarvis_key');
+let API_KEY = localStorage.getItem("jarvis_key");
 
 if (!API_KEY) {
-    API_KEY = prompt('Enter your Gemini API Key:');
+    API_KEY = prompt("Enter your Gemini API Key:");
 
     if (API_KEY) {
-        localStorage.setItem('jarvis_key', API_KEY);
+        localStorage.setItem("jarvis_key", API_KEY);
     }
 }
+
+
+// =====================================================
+// 2. GEMINI MODELS
+// =====================================================
 
 const MODELS = [
     "gemini-3.5-flash",
@@ -24,298 +31,1045 @@ const MODELS = [
 
 
 // =====================================================
-// 2. MEMORY SYSTEM
+// 3. DOM ELEMENTS
 // =====================================================
 
-let MEMORY = JSON.parse(
-    localStorage.getItem('jarvis_memory') || '[]'
+const chat = document.getElementById("chat");
+const msg = document.getElementById("msg");
+const micBtn = document.getElementById("mic-btn");
+const clearBtn = document.getElementById("clear-btn");
+const camBtn = document.getElementById("cam-btn");
+const imgInput = document.getElementById("img-input");
+const sendBtn = document.getElementById("send");
+
+
+// =====================================================
+// 4. MEMORY
+// =====================================================
+
+let memory = JSON.parse(
+    localStorage.getItem("jarvis_memory") || "[]"
 );
 
-function saveMemory() {
+const MAX_MEMORY = 20;
+
+
+function saveMemory(role, text) {
+
+    memory.push({
+        role: role,
+        text: text,
+        time: new Date().toISOString()
+    });
+
+    if (memory.length > MAX_MEMORY) {
+        memory = memory.slice(-MAX_MEMORY);
+    }
 
     localStorage.setItem(
-        'jarvis_memory',
-        JSON.stringify(MEMORY)
+        "jarvis_memory",
+        JSON.stringify(memory)
     );
-
 }
 
 
 // =====================================================
-// 3. TOOLS — 15 TOOLS
+// 5. CHAT UI
+// =====================================================
+
+function add(text, who = "JARVIS") {
+
+    if (!chat) return;
+
+    const div = document.createElement("div");
+
+    div.className =
+        who === "YOU"
+            ? "user-message"
+            : "jarvis-message";
+
+    div.innerText = text;
+
+    chat.appendChild(div);
+
+    chat.scrollTop = chat.scrollHeight;
+}
+
+
+// =====================================================
+// 6. SPEECH OUTPUT
+// =====================================================
+
+function speak(text) {
+
+    if (!("speechSynthesis" in window)) return;
+
+    try {
+
+        speechSynthesis.cancel();
+
+        const cleanText = String(text)
+            .replace(/[*_#`]/g, "")
+            .replace(/[📍🌤️🌡️💧💨☁️🌧️❄️📅⏰🔢📝]/gu, "");
+
+        const utterance =
+            new SpeechSynthesisUtterance(cleanText);
+
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+
+        speechSynthesis.speak(utterance);
+
+    } catch (e) {
+        console.error("Speech error:", e);
+    }
+}
+
+
+// =====================================================
+// 7. WEATHER DESCRIPTION
+// =====================================================
+
+function weatherDescription(code) {
+
+    const map = {
+
+        0: "Clear sky",
+        1: "Mainly clear",
+        2: "Partly cloudy",
+        3: "Overcast",
+
+        45: "Fog",
+        48: "Depositing rime fog",
+
+        51: "Light drizzle",
+        53: "Moderate drizzle",
+        55: "Dense drizzle",
+
+        56: "Light freezing drizzle",
+        57: "Dense freezing drizzle",
+
+        61: "Slight rain",
+        63: "Moderate rain",
+        65: "Heavy rain",
+
+        66: "Light freezing rain",
+        67: "Heavy freezing rain",
+
+        71: "Slight snowfall",
+        73: "Moderate snowfall",
+        75: "Heavy snowfall",
+
+        77: "Snow grains",
+
+        80: "Slight rain showers",
+        81: "Moderate rain showers",
+        82: "Violent rain showers",
+
+        85: "Slight snow showers",
+        86: "Heavy snow showers",
+
+        95: "Thunderstorm",
+
+        96: "Thunderstorm with slight hail",
+        99: "Thunderstorm with heavy hail"
+    };
+
+    return map[code] || "Unknown weather";
+}
+
+
+// =====================================================
+// 8. GPS LOCATION
+// =====================================================
+
+function getBrowserLocation() {
+
+    return new Promise((resolve) => {
+
+        if (!navigator.geolocation) {
+            resolve(null);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+
+            position => {
+
+                resolve({
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+
+                    accuracy:
+                        Math.round(
+                            position.coords.accuracy || 0
+                        ),
+
+                    source: "GPS / Browser"
+                });
+
+            },
+
+            error => {
+
+                console.log(
+                    "Browser location unavailable:",
+                    error.code
+                );
+
+                resolve(null);
+            },
+
+            {
+                enableHighAccuracy: true,
+                timeout: 12000,
+                maximumAge: 300000
+            }
+        );
+    });
+}
+
+
+// =====================================================
+// 9. NETWORK LOCATION FALLBACK
+// =====================================================
+
+async function getNetworkLocation() {
+
+    // ---------- API 1 ----------
+    try {
+
+        const response =
+            await fetch(
+                "https://ipapi.co/json/",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (response.ok) {
+
+            const data =
+                await response.json();
+
+            if (
+                data.latitude &&
+                data.longitude
+            ) {
+
+                return {
+
+                    lat: Number(data.latitude),
+                    lon: Number(data.longitude),
+
+                    city:
+                        data.city || "",
+
+                    region:
+                        data.region || "",
+
+                    country:
+                        data.country_name || "",
+
+                    postal:
+                        data.postal || "",
+
+                    source:
+                        "Network location estimate",
+
+                    accuracy:
+                        "Approximate"
+                };
+            }
+        }
+
+    } catch (error) {
+
+        console.log(
+            "Network location API 1 failed"
+        );
+    }
+
+
+    // ---------- API 2 ----------
+    try {
+
+        const response =
+            await fetch(
+                "https://ipwho.is/",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (response.ok) {
+
+            const data =
+                await response.json();
+
+            if (
+                data.success !== false &&
+                data.latitude &&
+                data.longitude
+            ) {
+
+                return {
+
+                    lat:
+                        Number(data.latitude),
+
+                    lon:
+                        Number(data.longitude),
+
+                    city:
+                        data.city || "",
+
+                    region:
+                        data.region || "",
+
+                    country:
+                        data.country || "",
+
+                    postal:
+                        data.postal || "",
+
+                    source:
+                        "Network location estimate",
+
+                    accuracy:
+                        "Approximate"
+                };
+            }
+        }
+
+    } catch (error) {
+
+        console.log(
+            "Network location API 2 failed"
+        );
+    }
+
+
+    return null;
+}
+
+
+// =====================================================
+// 10. BEST AVAILABLE LOCATION
+// =====================================================
+
+async function getBestLocation() {
+
+    // First try GPS/browser
+    let location =
+        await getBrowserLocation();
+
+    // If unavailable, network fallback
+    if (!location) {
+
+        location =
+            await getNetworkLocation();
+    }
+
+    if (!location) {
+        return null;
+    }
+
+
+    // =================================================
+    // REVERSE GEOCODING
+    // =================================================
+
+    try {
+
+        const url =
+            "https://nominatim.openstreetmap.org/reverse" +
+            "?format=jsonv2" +
+            "&lat=" + encodeURIComponent(location.lat) +
+            "&lon=" + encodeURIComponent(location.lon) +
+            "&zoom=18" +
+            "&addressdetails=1";
+
+        const response =
+            await fetch(url, {
+                headers: {
+                    "Accept":
+                        "application/json"
+                }
+            });
+
+        if (response.ok) {
+
+            const data =
+                await response.json();
+
+            const address =
+                data.address || {};
+
+            location.displayName =
+                data.display_name || "";
+
+            location.city =
+                address.city ||
+                address.town ||
+                address.municipality ||
+                address.village ||
+                location.city ||
+                "";
+
+            location.district =
+                address.city_district ||
+                address.district ||
+                address.county ||
+                "";
+
+            location.state =
+                address.state ||
+                location.region ||
+                "";
+
+            location.country =
+                address.country ||
+                location.country ||
+                "";
+
+            location.area =
+                address.suburb ||
+                address.neighbourhood ||
+                address.residential ||
+                "";
+
+            location.road =
+                address.road || "";
+
+            location.postcode =
+                address.postcode ||
+                location.postal ||
+                "";
+
+        }
+
+    } catch (error) {
+
+        console.log(
+            "Reverse geocoding unavailable"
+        );
+    }
+
+
+    return location;
+}
+
+
+// =====================================================
+// 11. LOCATION INFORMATION
+// =====================================================
+
+async function getLocationInfo() {
+
+    const location =
+        await getBestLocation();
+
+    if (!location) {
+
+        return (
+            "📍 Location service is unavailable right now, Boss."
+        );
+    }
+
+
+    let result =
+        "📍 CURRENT LOCATION\n\n";
+
+
+    if (location.city) {
+
+        result +=
+            "City: " +
+            location.city +
+            "\n";
+    }
+
+
+    if (location.area) {
+
+        result +=
+            "Area: " +
+            location.area +
+            "\n";
+    }
+
+
+    if (location.district) {
+
+        result +=
+            "District: " +
+            location.district +
+            "\n";
+    }
+
+
+    if (location.state) {
+
+        result +=
+            "State: " +
+            location.state +
+            "\n";
+    }
+
+
+    if (location.country) {
+
+        result +=
+            "Country: " +
+            location.country +
+            "\n";
+    }
+
+
+    if (location.postcode) {
+
+        result +=
+            "PIN: " +
+            location.postcode +
+            "\n";
+    }
+
+
+    result +=
+        "\nCoordinates: " +
+        location.lat.toFixed(6) +
+        ", " +
+        location.lon.toFixed(6) +
+        "\n";
+
+
+    result +=
+        "Source: " +
+        (location.source || "Location service");
+
+
+    if (location.accuracy) {
+
+        result +=
+            "\nAccuracy: " +
+            location.accuracy +
+            (
+                typeof location.accuracy === "number"
+                    ? " meters"
+                    : ""
+            );
+    }
+
+
+    return result;
+}
+
+
+// =====================================================
+// 12. DETAILED WEATHER
+// =====================================================
+
+async function getDetailedWeather() {
+
+    const location =
+        await getBestLocation();
+
+    if (!location) {
+
+        return (
+            "🌤️ Weather service is unavailable right now, Boss."
+        );
+    }
+
+
+    const url =
+        "https://api.open-meteo.com/v1/forecast" +
+
+        "?latitude=" +
+        encodeURIComponent(location.lat) +
+
+        "&longitude=" +
+        encodeURIComponent(location.lon) +
+
+        "&current=" +
+        [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "apparent_temperature",
+            "is_day",
+            "precipitation",
+            "rain",
+            "showers",
+            "snowfall",
+            "weather_code",
+            "cloud_cover",
+            "surface_pressure",
+            "wind_speed_10m",
+            "wind_direction_10m",
+            "wind_gusts_10m"
+        ].join(",") +
+
+        "&hourly=" +
+        [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "precipitation_probability",
+            "precipitation",
+            "weather_code",
+            "cloud_cover",
+            "wind_speed_10m"
+        ].join(",") +
+
+        "&daily=" +
+        [
+            "weather_code",
+            "temperature_2m_max",
+            "temperature_2m_min",
+            "apparent_temperature_max",
+            "apparent_temperature_min",
+            "precipitation_sum",
+            "precipitation_probability_max",
+            "wind_speed_10m_max",
+            "sunrise",
+            "sunset"
+        ].join(",") +
+
+        "&timezone=auto";
+
+
+    try {
+
+        const response =
+            await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(
+                "Weather API failed"
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        const current =
+            data.current || {};
+
+        const daily =
+            data.daily || {};
+
+
+        const place =
+            location.city ||
+            location.district ||
+            location.state ||
+            "your location";
+
+
+        let result =
+            "🌤️ DETAILED WEATHER\n\n";
+
+
+        result +=
+            "📍 Location: " +
+            place +
+            "\n";
+
+
+        if (location.district) {
+
+            result +=
+                "District: " +
+                location.district +
+                "\n";
+        }
+
+
+        if (location.state) {
+
+            result +=
+                "State: " +
+                location.state +
+                "\n";
+        }
+
+
+        result +=
+            "\n";
+
+
+        // Current
+        result +=
+            "🌡️ Current Temperature: " +
+            current.temperature_2m +
+            " °C\n";
+
+
+        result +=
+            "🌡️ Feels Like: " +
+            current.apparent_temperature +
+            " °C\n";
+
+
+        result +=
+            "☁️ Condition: " +
+            weatherDescription(
+                current.weather_code
+            ) +
+            "\n";
+
+
+        result +=
+            "💧 Humidity: " +
+            current.relative_humidity_2m +
+            " %\n";
+
+
+        result +=
+            "☁️ Cloud Cover: " +
+            current.cloud_cover +
+            " %\n";
+
+
+        result +=
+            "🌧️ Precipitation: " +
+            current.precipitation +
+            " mm\n";
+
+
+        result +=
+            "🌧️ Rain: " +
+            current.rain +
+            " mm\n";
+
+
+        result +=
+            "💨 Wind: " +
+            current.wind_speed_10m +
+            " km/h\n";
+
+
+        result +=
+            "💨 Wind Gusts: " +
+            current.wind_gusts_10m +
+            " km/h\n";
+
+
+        result +=
+            "🧭 Wind Direction: " +
+            current.wind_direction_10m +
+            "°\n";
+
+
+        result +=
+            "Pressure: " +
+            current.surface_pressure +
+            " hPa\n";
+
+
+        // Tomorrow / Daily
+        if (
+            daily.temperature_2m_max &&
+            daily.temperature_2m_min
+        ) {
+
+            result +=
+                "\n📅 TODAY FORECAST\n";
+
+
+            result +=
+                "Min: " +
+                daily.temperature_2m_min[0] +
+                " °C\n";
+
+
+            result +=
+                "Max: " +
+                daily.temperature_2m_max[0] +
+                " °C\n";
+
+
+            result +=
+                "Feels Like Max: " +
+                daily.apparent_temperature_max[0] +
+                " °C\n";
+
+
+            result +=
+                "Rain Probability: " +
+                (
+                    daily.precipitation_probability_max
+                        ? daily.precipitation_probability_max[0]
+                        : 0
+                ) +
+                " %\n";
+
+
+            result +=
+                "Rain Amount: " +
+                (
+                    daily.precipitation_sum
+                        ? daily.precipitation_sum[0]
+                        : 0
+                ) +
+                " mm\n";
+
+
+            result +=
+                "Maximum Wind: " +
+                (
+                    daily.wind_speed_10m_max
+                        ? daily.wind_speed_10m_max[0]
+                        : 0
+                ) +
+                " km/h\n";
+        }
+
+
+        if (
+            daily.sunrise &&
+            daily.sunset
+        ) {
+
+            result +=
+                "\n☀️ Sunrise: " +
+                daily.sunrise[0] +
+                "\n";
+
+
+            result +=
+                "🌇 Sunset: " +
+                daily.sunset[0] +
+                "\n";
+        }
+
+
+        result +=
+            "\nLocation source: " +
+            (
+                location.source ||
+                "Location service"
+            );
+
+
+        return result;
+
+    } catch (error) {
+
+        console.error(
+            "Weather error:",
+            error
+        );
+
+        return (
+            "🌤️ Weather data could not be loaded right now, Boss."
+        );
+    }
+}
+
+
+// =====================================================
+// 13. TOOL HANDLER
 // =====================================================
 
 async function handleTools(text) {
 
-    const t = text.toLowerCase().trim();
+    const original =
+        String(text || "").trim();
+
+    const t =
+        original.toLowerCase();
 
 
     // =================================================
-    // TOOL 1 — TIME
+    // TOOL 1 - TIME
     // =================================================
 
     if (
-        /\btime\b/.test(t) ||
-        t.includes('టైమ్') ||
-        t.includes('సమయం')
+        /\b(time|current time|what time)\b/i
+            .test(t)
     ) {
 
         return (
-            'The time is ' +
-            new Date().toLocaleTimeString() +
-            ', Boss.'
+            "⏰ Current time: " +
+            new Date().toLocaleTimeString()
         );
-
     }
 
 
     // =================================================
-    // TOOL 2 — DATE
+    // TOOL 2 - LOCATION
     // =================================================
 
     if (
-        /\bdate\b/.test(t) ||
-        t.includes('తేదీ') ||
-        t.includes('today')
+        /\b(where am i|my location|current location|location|where i am)\b/i
+            .test(t)
+    ) {
+
+        return await getLocationInfo();
+    }
+
+
+    // =================================================
+    // TOOL 3 - WEATHER
+    // =================================================
+
+    if (
+        /\b(weather|temperature|rain|forecast|climate|hot|cold)\b/i
+            .test(t)
+    ) {
+
+        return await getDetailedWeather();
+    }
+
+
+    // =================================================
+    // TOOL 4 - DATE
+    // =================================================
+
+    if (
+        /\b(date|today's date|todays date|what date)\b/i
+            .test(t)
     ) {
 
         return (
-            'Today is ' +
+            "📅 Today is " +
             new Date().toLocaleDateString(
-                'en-IN',
+                undefined,
                 {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric"
                 }
-            ) +
-            ', Boss.'
+            )
         );
-
     }
 
 
     // =================================================
-    // TOOL 3 — WEATHER
-    // =================================================
-
-    if (
-        t.includes('weather') ||
-        t.includes('వాతావరణం')
-    ) {
-
-        return await new Promise(resolve => {
-
-            if (!navigator.geolocation) {
-
-                resolve(
-                    'Geolocation is not supported, Boss.'
-                );
-
-                return;
-            }
-
-
-            navigator.geolocation.getCurrentPosition(
-
-                async position => {
-
-                    try {
-
-                        const lat =
-                            position.coords.latitude;
-
-                        const lon =
-                            position.coords.longitude;
-
-                        const url =
-                            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
-
-                        const response =
-                            await fetch(url);
-
-                        const data =
-                            await response.json();
-
-                        const weather =
-                            data.current_weather;
-
-                        if (!weather) {
-
-                            resolve(
-                                'Weather data unavailable, Boss.'
-                            );
-
-                            return;
-                        }
-
-                        resolve(
-                            `Temperature is ${weather.temperature}°C and wind speed is ${weather.windspeed} km/h, Boss.`
-                        );
-
-                    }
-
-                    catch (error) {
-
-                        resolve(
-                            'Weather service error, Boss.'
-                        );
-
-                    }
-
-                },
-
-                () => {
-
-                    resolve(
-                        'Location permission is required for weather, Boss.'
-                    );
-
-                }
-
-            );
-
-        });
-
-    }
-
-
-    // =================================================
-    // TOOL 4 — TIMER
+    // TOOL 5 - TIMER
     // =================================================
 
     const timerMatch =
         t.match(
-            /(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)/i
+            /(?:timer|set timer)\s+(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)?/i
         );
 
-    if (
-        (
-            t.includes('timer') ||
-            t.includes('టైమర్')
-        ) &&
-        timerMatch
-    ) {
+    if (timerMatch) {
 
-        const amount =
-            parseInt(timerMatch[1]);
+        const value =
+            Number(timerMatch[1]);
 
         const unit =
-            timerMatch[2].toLowerCase();
+            (timerMatch[2] || "seconds")
+                .toLowerCase();
 
-        let factor;
+        let milliseconds =
+            value * 1000;
+
 
         if (
-            /^(hours?|hrs?|h)/.test(unit)
+            unit.startsWith("minute") ||
+            unit.startsWith("min")
         ) {
 
-            factor = 3600000;
-
+            milliseconds =
+                value * 60 * 1000;
         }
-        else if (
-            /^(seconds?|secs?|s)/.test(unit)
+
+
+        if (
+            unit.startsWith("hour") ||
+            unit.startsWith("hr")
         ) {
 
-            factor = 1000;
-
+            milliseconds =
+                value * 60 * 60 * 1000;
         }
-        else {
-
-            factor = 60000;
-
-        }
-
-        const duration =
-            amount * factor;
 
 
         setTimeout(() => {
 
-            speak(
-                `Timer finished. ${amount} ${unit} completed.`
-            );
-
             alert(
-                `⏰ J.A.R.V.I.S TIMER\n\n${amount} ${unit} completed!`
+                "⏰ JARVIS TIMER FINISHED"
             );
 
-        }, duration);
+            speak(
+                "Boss, your timer is finished."
+            );
+
+        }, milliseconds);
 
 
         return (
-            `Timer set for ${amount} ${unit}, Boss.`
+            "⏰ Timer started for " +
+            value +
+            " " +
+            unit +
+            "."
         );
-
     }
 
 
     // =================================================
-    // TOOL 5 — YOUTUBE
+    // TOOL 6 - YOUTUBE
     // =================================================
 
     if (
-        t.includes('youtube') ||
-        t.startsWith('play ')
+        t.startsWith("youtube ")
     ) {
 
-        const q =
-            text
-                .replace(
-                    /youtube\s*(search\s*)?/i,
-                    ''
-                )
-                .replace(
-                    /^play\s+/i,
-                    ''
-                )
-                .trim();
+        const query =
+            original.substring(8).trim();
 
-
-        if (q) {
-
-            window.open(
-                'https://www.youtube.com/results?search_query=' +
-                encodeURIComponent(q),
-                '_blank'
-            );
-
-            return (
-                'Searching YouTube for ' +
-                q +
-                ', Boss.'
-            );
-
+        if (!query) {
+            return "Please tell me what to search on YouTube.";
         }
 
+
+        const url =
+            "https://www.youtube.com/results?search_query=" +
+            encodeURIComponent(query);
+
+        window.open(url, "_blank");
+
+        return (
+            "▶️ Searching YouTube for: " +
+            query
+        );
     }
 
 
     // =================================================
-    // TOOL 6 — CALCULATOR
+    // TOOL 7 - CALCULATOR
     // =================================================
 
     if (
-        t.startsWith('calculate ') ||
-        t.startsWith('calculator ') ||
-        t.startsWith('calc ')
+        t.startsWith("calculate ") ||
+        t.startsWith("calc ")
     ) {
 
-        const expression =
-            text
-                .replace(
-                    /^(calculate|calculator|calc)\s+/i,
-                    ''
-                )
+        let expression =
+            original
+                .replace(/^calculate\s+/i, "")
+                .replace(/^calc\s+/i, "")
                 .trim();
 
 
-        if (!/^[0-9+\-*/().%\s]+$/.test(expression)) {
+        // Only allow mathematical characters
+        if (
+            !/^[0-9+\-*/().%\s]+$/.test(
+                expression
+            )
+        ) {
 
             return (
-                'I can calculate numbers and basic mathematical expressions only, Boss.'
+                "Calculator accepts numbers and + - * / % ( )."
             );
-
         }
 
 
@@ -328,189 +1082,209 @@ async function handleTools(text) {
                     ')'
                 )();
 
-            return (
-                `${expression} = ${result}, Boss.`
-            );
-
-        }
-
-        catch {
 
             return (
-                'Invalid mathematical expression, Boss.'
+                "🔢 Result: " +
+                result
             );
 
-        }
+        } catch {
 
+            return (
+                "❌ I could not calculate that expression."
+            );
+        }
     }
 
 
     // =================================================
-    // TOOL 7 — OPEN WEBSITE
+    // TOOL 8 - OPEN WEBSITE
     // =================================================
 
     if (
-        t.startsWith('open website ') ||
-        t.startsWith('open site ') ||
-        t.startsWith('open url ')
+        t.startsWith("open website ") ||
+        t.startsWith("open site ")
     ) {
 
-        let url =
-            text
-                .replace(
-                    /^(open website|open site|open url)\s+/i,
-                    ''
-                )
+        let site =
+            original
+                .replace(/^open website\s+/i, "")
+                .replace(/^open site\s+/i, "")
                 .trim();
+
+
+        if (!site) {
+            return "Tell me the website name.";
+        }
 
 
         if (
-            !url.startsWith('http://') &&
-            !url.startsWith('https://')
+            !site.startsWith("http://") &&
+            !site.startsWith("https://")
         ) {
 
-            url =
-                'https://' + url;
-
+            site =
+                "https://" +
+                site;
         }
 
 
-        window.open(url, '_blank');
-
-        return (
-            'Opening ' + url + ', Boss.'
+        window.open(
+            site,
+            "_blank"
         );
 
+
+        return (
+            "🌐 Opening " +
+            site
+        );
     }
 
 
     // =================================================
-    // TOOL 8 — GOOGLE SEARCH
+    // TOOL 9 - GOOGLE SEARCH
     // =================================================
 
     if (
-        t.startsWith('search google ') ||
-        t.startsWith('google search ') ||
-        t.startsWith('search for ')
+        t.startsWith("google ") ||
+        t.startsWith("search google ") ||
+        t.startsWith("search ")
     ) {
 
-        const q =
-            text
-                .replace(
-                    /^(search google|google search|search for)\s+/i,
-                    ''
-                )
+        let query =
+            original
+                .replace(/^search google\s+/i, "")
+                .replace(/^google\s+/i, "")
+                .replace(/^search\s+/i, "")
                 .trim();
 
 
-        if (q) {
-
-            window.open(
-                'https://www.google.com/search?q=' +
-                encodeURIComponent(q),
-                '_blank'
-            );
-
-            return (
-                'Searching Google for ' +
-                q +
-                ', Boss.'
-            );
-
+        if (!query) {
+            return "Tell me what you want to search.";
         }
 
+
+        const url =
+            "https://www.google.com/search?q=" +
+            encodeURIComponent(query);
+
+
+        window.open(
+            url,
+            "_blank"
+        );
+
+
+        return (
+            "🔎 Searching Google for: " +
+            query
+        );
     }
 
 
     // =================================================
-    // TOOL 9 — TRANSLATE
+    // TOOL 10 - TRANSLATE
     // =================================================
 
     if (
-        t.startsWith('translate')
+        t.startsWith("translate ")
     ) {
 
-        const q =
-            text
-                .replace(
-                    /^translate\s*(this\s*)?/i,
-                    ''
-                )
+        let query =
+            original
+                .replace(/^translate\s+/i, "")
                 .trim();
 
 
-        if (!q) {
-
-            return (
-                'Please provide something to translate, Boss.'
-            );
-
+        if (!query) {
+            return "Tell me what you want me to translate.";
         }
 
 
         try {
 
             const url =
-                'https://api.mymemory.translated.net/get?q=' +
-                encodeURIComponent(q) +
-                '&langpair=en|te';
+                "https://api.mymemory.translated.net/get" +
+                "?q=" +
+                encodeURIComponent(query) +
+                "&langpair=en|te";
 
 
             const response =
                 await fetch(url);
 
+
             const data =
                 await response.json();
 
 
+            const translation =
+                data?.responseData?.translatedText;
+
+
+            if (!translation) {
+
+                return (
+                    "Translation is unavailable right now."
+                );
+            }
+
+
             return (
-                'In Telugu: ' +
-                data.responseData.translatedText
+                "🌐 Telugu Translation:\n" +
+                translation
             );
 
-        }
-
-        catch {
+        } catch {
 
             return (
-                'Translation service error, Boss.'
+                "Translation service is unavailable right now."
             );
-
         }
-
     }
 
 
     // =================================================
-    // TOOL 10 — STOPWATCH
+    // TOOL 11 - STOPWATCH
     // =================================================
 
     if (
-        t.includes('start stopwatch') ||
-        t.includes('start stop watch')
+        t.includes("start stopwatch")
     ) {
+
+        if (
+            window.jarvisStopwatchStart
+        ) {
+
+            return (
+                "⏱️ Stopwatch is already running."
+            );
+        }
+
 
         window.jarvisStopwatchStart =
             Date.now();
 
-        return (
-            'Stopwatch started, Boss.'
-        );
 
+        return (
+            "⏱️ Stopwatch started."
+        );
     }
 
 
     if (
-        t.includes('stop stopwatch') ||
-        t.includes('stop stop watch')
+        t.includes("stop stopwatch") ||
+        t.includes("stop watch")
     ) {
 
-        if (!window.jarvisStopwatchStart) {
+        if (
+            !window.jarvisStopwatchStart
+        ) {
 
             return (
-                'Stopwatch is not running, Boss.'
+                "⏱️ Stopwatch is not running."
             );
-
         }
 
 
@@ -524,214 +1298,273 @@ async function handleTools(text) {
 
 
         const seconds =
-            Math.floor(elapsed / 1000);
+            Math.floor(
+                elapsed / 1000
+            );
 
 
         return (
-            `Stopwatch stopped. Elapsed time: ${seconds} seconds, Boss.`
+            "⏱️ Stopwatch stopped.\n" +
+            "Elapsed time: " +
+            seconds +
+            " seconds."
         );
+    }
 
+
+    if (
+        t.includes("stopwatch")
+    ) {
+
+        if (
+            !window.jarvisStopwatchStart
+        ) {
+
+            return (
+                "⏱️ Stopwatch is not running."
+            );
+        }
+
+
+        const elapsed =
+            Date.now() -
+            window.jarvisStopwatchStart;
+
+
+        const seconds =
+            Math.floor(
+                elapsed / 1000
+            );
+
+
+        return (
+            "⏱️ Stopwatch: " +
+            seconds +
+            " seconds."
+        );
     }
 
 
     // =================================================
-    // TOOL 11 — NOTES
+    // TOOL 12 - SAVE NOTE
     // =================================================
 
     if (
-        t.startsWith('note ') ||
-        t.startsWith('remember ')
+        t.startsWith("save note ")
     ) {
 
         const note =
-            text
-                .replace(
-                    /^(note|remember)\s+/i,
-                    ''
-                )
+            original
+                .replace(/^save note\s+/i, "")
                 .trim();
 
 
         if (!note) {
 
             return (
-                'Please provide a note, Boss.'
+                "Tell me what note you want to save."
             );
-
         }
 
 
-        let notes =
+        const notes =
             JSON.parse(
                 localStorage.getItem(
-                    'jarvis_notes'
-                ) || '[]'
+                    "jarvis_notes"
+                ) || "[]"
             );
 
 
         notes.push({
             text: note,
-            time: new Date().toISOString()
+            time:
+                new Date().toLocaleString()
         });
 
 
         localStorage.setItem(
-            'jarvis_notes',
+            "jarvis_notes",
             JSON.stringify(notes)
         );
 
 
         return (
-            'Note saved successfully, Boss.'
+            "📝 Note saved successfully."
         );
-
     }
 
 
     // =================================================
-    // TOOL 12 — SHOW NOTES
+    // TOOL 13 - SHOW NOTES
     // =================================================
 
     if (
-        t.includes('show notes') ||
-        t.includes('my notes') ||
-        t.includes('show my notes')
+        t.includes("show notes") ||
+        t.includes("my notes") ||
+        t.includes("show my notes")
     ) {
 
         const notes =
             JSON.parse(
                 localStorage.getItem(
-                    'jarvis_notes'
-                ) || '[]'
+                    "jarvis_notes"
+                ) || "[]"
             );
 
 
         if (!notes.length) {
 
             return (
-                'You do not have any saved notes, Boss.'
+                "📝 You don't have any saved notes."
             );
-
         }
 
 
-        return (
-            'Your notes:\n\n' +
-            notes
-                .map(
-                    (n, i) =>
-                        `${i + 1}. ${n.text}`
-                )
-                .join('\n')
+        let result =
+            "📝 YOUR NOTES\n\n";
+
+
+        notes.forEach(
+            (note, index) => {
+
+                result +=
+                    (
+                        index + 1
+                    ) +
+                    ". " +
+                    note.text +
+                    "\n";
+
+                result +=
+                    "   " +
+                    note.time +
+                    "\n\n";
+            }
         );
 
+
+        return result;
     }
 
 
     // =================================================
-    // TOOL 13 — SYSTEM INFO
+    // TOOL 14 - SYSTEM INFO
     // =================================================
 
     if (
-        t.includes('system info') ||
-        t.includes('computer info') ||
-        t.includes('device info')
+        t.includes("system info") ||
+        t.includes("system information") ||
+        t.includes("my system")
     ) {
 
-        return `
-System Information:
+        return (
+            "💻 SYSTEM INFORMATION\n\n" +
 
-Browser: ${navigator.userAgent}
-Platform: ${navigator.platform}
-Language: ${navigator.language}
-CPU Cores: ${navigator.hardwareConcurrency || 'Unknown'}
-Online: ${navigator.onLine ? 'Yes' : 'No'}
-Screen: ${screen.width} x ${screen.height}
-Boss.
-        `.trim();
+            "Platform: " +
+            navigator.platform +
+            "\n" +
 
+            "Browser: " +
+            navigator.userAgent +
+            "\n" +
+
+            "Language: " +
+            navigator.language +
+            "\n" +
+
+            "Online: " +
+            (
+                navigator.onLine
+                    ? "Yes"
+                    : "No"
+            ) +
+            "\n" +
+
+            "CPU Cores: " +
+            (
+                navigator.hardwareConcurrency ||
+                "Unknown"
+            ) +
+            "\n" +
+
+            "Screen: " +
+            screen.width +
+            " × " +
+            screen.height
+        );
     }
 
 
     // =================================================
-    // TOOL 14 — IP ADDRESS
+    // TOOL 15 - PUBLIC IP
     // =================================================
 
     if (
-        t.includes('my ip') ||
-        t.includes('ip address')
+        t.includes("my ip") ||
+        t.includes("public ip") ||
+        t.includes("ip address")
     ) {
 
         try {
 
             const response =
                 await fetch(
-                    'https://api.ipify.org?format=json'
+                    "https://api.ipify.org?format=json",
+                    {
+                        cache: "no-store"
+                    }
                 );
+
 
             const data =
                 await response.json();
 
 
             return (
-                `Your public IP address is ${data.ip}, Boss.`
+                "🌐 Your public IP address is: " +
+                data.ip
             );
 
-        }
-
-        catch {
+        } catch {
 
             return (
-                'Unable to retrieve your IP address, Boss.'
+                "Public IP service is unavailable right now."
             );
-
         }
-
     }
 
 
     // =================================================
-    // TOOL 15 — RANDOM NUMBER
+    // TOOL 16 - RANDOM NUMBER
     // =================================================
 
-    if (
-        t.includes('random number') ||
-        t.includes('generate random number')
-    ) {
-
-        const match =
-            t.match(
-                /(\d+)\s*(to|-)\s*(\d+)/
-            );
+    const randomMatch =
+        t.match(
+            /random number(?: between)?\s+(\d+)\s+(?:and|to)\s+(\d+)/i
+        );
 
 
-        if (match) {
+    if (randomMatch) {
 
-            const min =
-                parseInt(match[1]);
+        const min =
+            Number(randomMatch[1]);
 
-            const max =
-                parseInt(match[3]);
-
-
-            const number =
-                Math.floor(
-                    Math.random() *
-                    (max - min + 1)
-                ) + min;
+        const max =
+            Number(randomMatch[2]);
 
 
-            return (
-                `Random number between ${min} and ${max}: ${number}, Boss.`
-            );
-
-        }
+        const random =
+            Math.floor(
+                Math.random() *
+                (max - min + 1)
+            ) +
+            min;
 
 
         return (
-            'Example: random number 1 to 100, Boss.'
+            "🎲 Random number: " +
+            random
         );
-
     }
 
 
@@ -740,96 +1573,123 @@ Boss.
     // =================================================
 
     return null;
-
 }
 
 
 // =====================================================
-// 4. DOM ELEMENTS
+// 14. GEMINI API
 // =====================================================
 
-const chat =
-    document.getElementById('chat');
+async function callGemini(
+    userText,
+    imageBase64 = null
+) {
 
-const input =
-    document.getElementById('msg');
+    if (!API_KEY) {
 
-const micBtn =
-    document.getElementById('mic-btn');
-
-const clearBtn =
-    document.getElementById('clear-btn');
-
-const camBtn =
-    document.getElementById('cam-btn');
-
-const imgInput =
-    document.getElementById('img-input');
-
-const sendBtn =
-    document.getElementById('send');
+        return (
+            "Gemini API key is not configured."
+        );
+    }
 
 
-// =====================================================
-// 5. LOAD SAVED MEMORY
-// =====================================================
-
-MEMORY.forEach(m => {
-
-    add(
-        (
-            m.role === 'user'
-                ? 'YOU: '
-                : 'J.A.R.V.I.S: '
-        ) + m.text,
-
-        m.role === 'user'
-            ? 'user'
-            : 'ai'
-    );
-
-});
+    const contents = [];
 
 
-// =====================================================
-// 6. GEMINI BRAIN
-// =====================================================
+    // Add previous memory
+    memory.forEach(item => {
 
-async function callGemini(prompt) {
+        contents.push({
+            role:
+                item.role === "model"
+                    ? "model"
+                    : "user",
 
-    const contents =
-        MEMORY
-            .slice(-12)
-            .map(m => ({
-
-                role:
-                    m.role === 'model'
-                        ? 'model'
-                        : 'user',
-
-                parts: [
-                    {
-                        text: m.text
-                    }
-                ]
-
-            }));
-
-
-    contents.push({
-
-        role: 'user',
-
-        parts: [
-            {
-                text: prompt
-            }
-        ]
+            parts: [
+                {
+                    text:
+                        item.text
+                }
+            ]
+        });
 
     });
 
 
-    let lastErr;
+    // Current message
+    const parts = [
+        {
+            text: userText
+        }
+    ];
+
+
+    // Image
+    if (imageBase64) {
+
+        parts.push({
+            inline_data: {
+                mime_type: "image/jpeg",
+                data: imageBase64
+            }
+        });
+    }
+
+
+    contents.push({
+        role: "user",
+        parts: parts
+    });
+
+
+    const body = {
+
+        system_instruction: {
+            parts: [
+                {
+                    text:
+                        `
+You are J.A.R.V.I.S, a smart personal AI assistant.
+
+Call the user "Boss" when appropriate.
+
+Be helpful, concise and intelligent.
+
+The browser application provides tools for:
+- Time
+- Location
+- Weather
+- Date
+- Timer
+- YouTube
+- Calculator
+- Website
+- Google Search
+- Translation
+- Stopwatch
+- Notes
+- System information
+- Public IP
+- Random numbers
+
+If a tool result is already provided, use that information directly.
+
+Do not invent location, weather, IP or system information.
+
+For normal questions, answer naturally.
+
+User language may be Telugu, English or Telugu-English mixed.
+Reply in the same language style as the user when practical.
+                        `
+                }
+            ]
+        },
+
+        contents: contents
+    };
+
+
+    let lastError = null;
 
 
     for (
@@ -838,417 +1698,276 @@ async function callGemini(prompt) {
 
         try {
 
-            const res =
-                await fetch(
-                    'https://generativelanguage.googleapis.com/v1beta/models/' +
-                    model +
-                    ':generateContent?key=' +
-                    API_KEY,
-                    {
+            const url =
+                "https://generativelanguage.googleapis.com/v1beta/models/" +
+                model +
+                ":generateContent?key=" +
+                encodeURIComponent(API_KEY);
 
-                        method: 'POST',
+
+            const response =
+                await fetch(
+                    url,
+                    {
+                        method: "POST",
 
                         headers: {
-                            'Content-Type':
-                                'application/json'
+                            "Content-Type":
+                                "application/json"
                         },
 
                         body:
-                            JSON.stringify({
-                                contents:
-                                    contents
-                            })
-
+                            JSON.stringify(body)
                     }
                 );
 
 
-            const data =
-                await res.json();
+            if (!response.ok) {
 
+                const errorText =
+                    await response.text();
 
-            if (data.error) {
-
-                lastErr =
+                lastError =
                     new Error(
-                        data.error.message
+                        model +
+                        " : " +
+                        errorText
                     );
 
-
-                if (
-                    /high demand|temporar|quota|rate|unavailable|deprecated/i
-                        .test(
-                            data.error.message
-                        )
-                ) {
-
-                    continue;
-
-                }
-
-
-                throw lastErr;
-
+                continue;
             }
 
 
-            if (
-                !data.candidates ||
-                !data.candidates[0]
-            ) {
+            const data =
+                await response.json();
 
-                throw new Error(
-                    'No response from Gemini.'
-                );
 
+            const answer =
+                data?.candidates?.[0]?.content?.parts
+                    ?.map(
+                        p => p.text || ""
+                    )
+                    .join("")
+                    .trim();
+
+
+            if (answer) {
+
+                return answer;
             }
 
+        } catch (error) {
 
-            return (
-                data
-                    .candidates[0]
-                    .content
-                    .parts[0]
-                    .text
-            );
-
+            lastError =
+                error;
         }
-
-        catch (e) {
-
-            lastErr = e;
-
-        }
-
     }
 
 
-    throw (
-        lastErr ||
-        new Error('Gemini request failed.')
+    console.error(
+        "Gemini error:",
+        lastError
     );
 
+
+    return (
+        "Sorry Boss, Gemini is not responding right now."
+    );
 }
 
 
 // =====================================================
-// 7. ASK J.A.R.V.I.S
+// 15. MAIN AI FUNCTION
 // =====================================================
 
-async function askGemini(prompt) {
+async function askGemini(text, imageBase64 = null) {
 
-    const thinking =
-        add(
-            'J.A.R.V.I.S: Thinking...',
-            'ai'
-        );
+    const userText =
+        String(text || "").trim();
 
 
-    try {
+    if (!userText && !imageBase64) {
+        return;
+    }
 
-        // =============================================
-        // FIRST → TOOLS
-        // =============================================
+
+    // =================================================
+    // CHECK TOOLS FIRST
+    // =================================================
+
+    if (!imageBase64) {
 
         const toolResult =
-            await handleTools(prompt);
+            await handleTools(userText);
 
 
-        if (toolResult !== null) {
+        if (toolResult) {
 
-            MEMORY.push({
-                role: 'user',
-                text: prompt
-            });
-
-
-            MEMORY.push({
-                role: 'model',
-                text: toolResult
-            });
+            add(
+                toolResult,
+                "JARVIS"
+            );
 
 
-            saveMemory();
+            saveMemory(
+                "model",
+                toolResult
+            );
 
 
-            thinking.innerText =
-                'J.A.R.V.I.S: ' +
-                toolResult;
-
-
-            speak(toolResult);
+            speak(
+                toolResult
+            );
 
 
             return;
-
         }
-
-
-        // =============================================
-        // SECOND → GEMINI
-        // =============================================
-
-        const reply =
-            await callGemini(prompt);
-
-
-        MEMORY.push({
-            role: 'user',
-            text: prompt
-        });
-
-
-        MEMORY.push({
-            role: 'model',
-            text: reply
-        });
-
-
-        saveMemory();
-
-
-        thinking.innerText =
-            'J.A.R.V.I.S: ' +
-            reply;
-
-
-        speak(reply);
-
     }
 
-    catch (e) {
 
-        console.error(e);
+    // =================================================
+    // GEMINI
+    // =================================================
+
+    const answer =
+        await callGemini(
+            userText,
+            imageBase64
+        );
 
 
-        thinking.innerText =
-            'J.A.R.V.I.S: ERROR - ' +
-            e.message;
+    add(
+        answer,
+        "JARVIS"
+    );
 
-    }
 
+    saveMemory(
+        "user",
+        userText
+    );
+
+
+    saveMemory(
+        "model",
+        answer
+    );
+
+
+    speak(answer);
 }
 
 
 // =====================================================
-// 8. VISION ENGINE
+// 16. SEND BUTTON
 // =====================================================
 
-if (
-    camBtn &&
-    imgInput
-) {
+if (sendBtn) {
 
-    camBtn.onclick = () => {
+    sendBtn.addEventListener(
+        "click",
+        async () => {
 
-        imgInput.click();
-
-    };
+            const text =
+                msg.value.trim();
 
 
-    imgInput.onchange = () => {
-
-        const file =
-            imgInput.files[0];
-
-
-        if (!file) return;
-
-
-        const reader =
-            new FileReader();
-
-
-        reader.onload = () => {
-
-            const base64 =
-                reader.result
-                    .split(',')[1];
-
-
-            const question =
-                input.value.trim() ||
-                'What do you see? Describe briefly.';
+            if (!text) return;
 
 
             add(
-                'YOU: [IMAGE] ' +
-                question,
-                'user'
+                text,
+                "YOU"
             );
 
 
-            input.value = '';
+            msg.value = "";
 
 
-            askVision(
-                base64,
-                file.type,
-                question
+            await askGemini(
+                text
             );
-
-        };
-
-
-        reader.readAsDataURL(file);
-
-    };
-
+        }
+    );
 }
 
 
 // =====================================================
-// 9. IMAGE ANALYSIS
+// 17. ENTER KEY
 // =====================================================
 
-async function askVision(
-    base64,
-    mime,
-    question
-) {
+if (msg) {
 
-    const thinking =
-        add(
-            'J.A.R.V.I.S: Analyzing image...',
-            'ai'
-        );
+    msg.addEventListener(
+        "keydown",
+        async e => {
 
+            if (
+                e.key === "Enter" &&
+                !e.shiftKey
+            ) {
 
-    let lastErr;
+                e.preventDefault();
 
 
-    for (
-        const model of MODELS
-    ) {
+                const text =
+                    msg.value.trim();
 
-        try {
 
-            const res =
-                await fetch(
-                    'https://generativelanguage.googleapis.com/v1beta/models/' +
-                    model +
-                    ':generateContent?key=' +
-                    API_KEY,
-                    {
+                if (!text) return;
 
-                        method: 'POST',
 
-                        headers: {
-                            'Content-Type':
-                                'application/json'
-                        },
-
-                        body:
-                            JSON.stringify({
-
-                                contents: [
-
-                                    {
-
-                                        role: 'user',
-
-                                        parts: [
-
-                                            {
-                                                text:
-                                                    question
-                                            },
-
-                                            {
-                                                inline_data: {
-
-                                                    mime_type:
-                                                        mime,
-
-                                                    data:
-                                                        base64
-
-                                                }
-
-                                            }
-
-                                        ]
-
-                                    }
-
-                                ]
-
-                            })
-
-                    }
+                add(
+                    text,
+                    "YOU"
                 );
 
 
-            const data =
-                await res.json();
+                msg.value = "";
 
 
-            if (data.error) {
-
-                lastErr =
-                    new Error(
-                        data.error.message
-                    );
-
-
-                if (
-                    /high demand|temporar|quota|rate|unavailable|deprecated/i
-                        .test(
-                            data.error.message
-                        )
-                ) {
-
-                    continue;
-
-                }
-
-
-                throw lastErr;
-
+                await askGemini(
+                    text
+                );
             }
-
-
-            const reply =
-                data
-                    .candidates[0]
-                    .content
-                    .parts[0]
-                    .text;
-
-
-            thinking.innerText =
-                'J.A.R.V.I.S: ' +
-                reply;
-
-
-            speak(reply);
-
-
-            return;
-
         }
-
-        catch (e) {
-
-            lastErr = e;
-
-        }
-
-    }
-
-
-    thinking.innerText =
-        'J.A.R.V.I.S: ERROR - ' +
-        (
-            lastErr?.message ||
-            'Unknown error'
-        );
-
+    );
 }
 
 
 // =====================================================
-// 10. VOICE RECOGNITION
+// 18. CLEAR MEMORY
+// =====================================================
+
+if (clearBtn) {
+
+    clearBtn.addEventListener(
+        "click",
+        () => {
+
+            memory = [];
+
+            localStorage.removeItem(
+                "jarvis_memory"
+            );
+
+
+            if (chat) {
+                chat.innerHTML = "";
+            }
+
+
+            add(
+                "Memory cleared, Boss.",
+                "JARVIS"
+            );
+        }
+    );
+}
+
+
+// =====================================================
+// 19. VOICE RECOGNITION
 // =====================================================
 
 const SpeechRecognition =
@@ -1266,287 +1985,166 @@ if (
 
 
     recognition.lang =
-        'en-US';
-
+        "en-IN";
 
     recognition.continuous =
         false;
-
 
     recognition.interimResults =
         false;
 
 
-    recognition.onresult =
-        event => {
-
-            const text =
-                event
-                    .results[0][0]
-                    .transcript;
-
-
-            add(
-                'YOU: ' + text,
-                'user'
-            );
-
-
-            askGemini(text);
-
-        };
-
-
-    micBtn.onclick =
+    recognition.onstart =
         () => {
 
-            try {
-
-                recognition.start();
-
-                micBtn.innerText =
-                    'LISTENING...';
-
-            }
-
-            catch (e) {
-
-                console.log(e);
-
-            }
-
+            micBtn.classList.add(
+                "listening"
+            );
         };
 
 
     recognition.onend =
         () => {
 
-            micBtn.innerText =
-                '🎙';
+            micBtn.classList.remove(
+                "listening"
+            );
+        };
+
+
+    recognition.onerror =
+        error => {
+
+            console.log(
+                "Speech recognition:",
+                error.error
+            );
 
         };
 
-}
+
+    recognition.onresult =
+        async event => {
+
+            const text =
+                event.results[0][0].transcript;
 
 
-// =====================================================
-// 11. TEXT TO SPEECH
-// =====================================================
-
-let voices = [];
+            if (!text) return;
 
 
-function loadVoices() {
-
-    voices =
-        speechSynthesis.getVoices();
-
-}
+            add(
+                text,
+                "YOU"
+            );
 
 
-loadVoices();
+            await askGemini(
+                text
+            );
+        };
 
 
-speechSynthesis.onvoiceschanged =
-    loadVoices;
-
-
-function speak(text) {
-
-    if (
-        !('speechSynthesis' in window)
-    ) {
-
-        return;
-
-    }
-
-
-    speechSynthesis.cancel();
-
-
-    const utterance =
-        new SpeechSynthesisUtterance(
-            text
-        );
-
-
-    utterance.rate =
-        1.05;
-
-
-    utterance.pitch =
-        0.85;
-
-
-    const voice =
-        voices.find(
-            v =>
-                v.lang.startsWith('en')
-        );
-
-
-    if (voice) {
-
-        utterance.voice =
-            voice;
-
-    }
-
-
-    speechSynthesis.speak(
-        utterance
-    );
-
-}
-
-
-// =====================================================
-// 12. SEND BUTTON
-// =====================================================
-
-sendBtn.onclick =
-    () => {
-
-        const text =
-            input.value.trim();
-
-
-        if (!text) return;
-
-
-        add(
-            'YOU: ' + text,
-            'user'
-        );
-
-
-        input.value = '';
-
-
-        askGemini(text);
-
-    };
-
-
-// =====================================================
-// 13. ENTER KEY
-// =====================================================
-
-input.addEventListener(
-    'keydown',
-    event => {
-
-        if (
-            event.key === 'Enter'
-        ) {
-
-            event.preventDefault();
-
-            sendBtn.click();
-
-        }
-
-    }
-);
-
-
-// =====================================================
-// 14. CLEAR MEMORY
-// =====================================================
-
-if (clearBtn) {
-
-    clearBtn.onclick =
+    micBtn.addEventListener(
+        "click",
         () => {
 
-            const confirmClear =
-                confirm(
-                    'Are you sure you want to clear J.A.R.V.I.S memory?'
+            try {
+
+                recognition.start();
+
+            } catch (error) {
+
+                console.log(
+                    "Recognition start:",
+                    error
                 );
-
-
-            if (!confirmClear) {
-
-                return;
-
             }
+        }
+    );
 
+} else if (micBtn) {
 
-            MEMORY = [];
+    micBtn.addEventListener(
+        "click",
+        () => {
 
-
-            saveMemory();
-
-
-            chat.innerHTML = '';
-
-
-            add(
-                'SYSTEM: Memory cleared.',
-                'ai'
+            speak(
+                "Voice recognition is not available in this browser."
             );
-
-        };
-
+        }
+    );
 }
 
 
 // =====================================================
-// 15. CHAT MESSAGE FUNCTION
+// 20. CAMERA / IMAGE INPUT
 // =====================================================
 
-function add(
-    text,
-    type
-) {
+if (camBtn && imgInput) {
 
-    const div =
-        document.createElement(
-            'div'
-        );
+    camBtn.addEventListener(
+        "click",
+        () => {
 
-
-    div.className =
-        'msg ' + type;
-
-
-    div.innerText =
-        text;
-
-
-    chat.appendChild(
-        div
+            imgInput.click();
+        }
     );
 
 
-    chat.scrollTop =
-        chat.scrollHeight;
+    imgInput.addEventListener(
+        "change",
+        event => {
+
+            const file =
+                event.target.files?.[0];
 
 
-    return div;
+            if (!file) return;
 
+
+            const reader =
+                new FileReader();
+
+
+            reader.onload =
+                async () => {
+
+                    const base64 =
+                        reader.result
+                            .split(",")[1];
+
+
+                    add(
+                        "📷 Image received. Analyzing...",
+                        "YOU"
+                    );
+
+
+                    await askGemini(
+                        "Analyze this image in detail. Tell me what you see.",
+                        base64
+                    );
+                };
+
+
+            reader.readAsDataURL(file);
+        }
+    );
 }
 
 
 // =====================================================
-// 16. STARTUP MESSAGE
+// 21. STARTUP MESSAGE
 // =====================================================
 
-setTimeout(
+window.addEventListener(
+    "load",
     () => {
 
-        if (
-            MEMORY.length === 0
-        ) {
-
-            add(
-                'J.A.R.V.I.S: Systems online. How may I assist you, Boss?',
-                'ai'
-            );
-
-        }
-
-    },
-    500
+        add(
+            "J.A.R.V.I.S online, Boss. All systems ready.",
+            "JARVIS"
+        );
+    }
 );
